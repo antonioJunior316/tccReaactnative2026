@@ -1,6 +1,6 @@
 import * as SMS from 'expo-sms';
-import { LocationService } from './locationService';
 import { ContactRepository } from '../database/contactRepository';
+import { LocationService } from './locationService';
 
 export const SmsService = {
   async sendSOS(message: string) {
@@ -10,17 +10,32 @@ export const SmsService = {
       throw new Error('Nenhum contato salvo');
     }
 
-    const phones = contacts.map(c => c.phone);
-
     const location = await LocationService.getLocation();
     const finalMessage = `${message}\n${location}`;
 
-    const isAvailable = await SMS.isAvailableAsync();
+    // Extrair apenas os números de telefone
+    const phoneNumbers = contacts.map(c => c.phone);
 
-    if (!isAvailable) {
-      throw new Error('SMS não disponível');
+    // Enviar SMS para todos os contatos
+    try {
+      const { result } = await SMS.sendSMSAsync(
+        phoneNumbers,
+        finalMessage
+      );
+
+      if (result === 'sent') {
+        return {
+          success: true,
+          message: `Mensagem SOS enviada para ${contacts.length} contato(s)`,
+          contactsCount: contacts.length,
+        };
+      } else if (result === 'cancelled') {
+        throw new Error('Envio de SMS cancelado pelo usuário');
+      } else {
+        throw new Error('Falha ao enviar SMS');
+      }
+    } catch (error: any) {
+      throw new Error(`Erro ao enviar SMS: ${error.message}`);
     }
-
-    await SMS.sendSMSAsync(phones, finalMessage);
   }
 };
